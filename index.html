@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ezber Takip Sistemi</title>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #065f46;
+            --secondary: #059669;
+            --accent: #f59e0b;
+            --bg-color: #f0fdf4;
+            --text-color: #1e293b;
+        }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: var(--bg-color); color: var(--text-color); margin: 0; padding: 0; }
+        header { background: linear-gradient(135deg, var(--primary), var(--secondary)); color: white; padding: 20px; text-align: center; box-shadow: 0 4px 10px rgba(0,0,0,0.15); }
+        .container { max-width: 1050px; margin: 20px auto; padding: 0 15px; }
+        .home-box, .card-box { background: white; padding: 30px; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.08); max-width: 400px; margin: 40px auto; text-align: center; }
+        .home-btn, .btn { display: block; width: 100%; background-color: var(--secondary); color: white; border: none; padding: 15px; margin: 15px 0; border-radius: 12px; font-size: 18px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.1); transition: 0.2s; }
+        .home-btn:hover, .btn:hover { background-color: #047857; transform: translateY(-2px); }
+        .btn-danger { background-color: #ef4444; }
+        .btn-danger:hover { background-color: #dc2626; }
+        input, select { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 15px; box-sizing: border-box; }
+        .student-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 20px; margin-top: 20px; }
+        .student-card-item { background: white; border-radius: 16px; padding: 15px; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.05); cursor: pointer; transition: 0.2s; border: 2px solid transparent; }
+        .student-card-item:hover { border-color: var(--secondary); transform: translateY(-5px); }
+        .grid-avatar, .student-avatar-large { border-radius: 50%; object-fit: cover; border: 3px solid var(--accent); background: #e2e8f0; }
+        .grid-avatar { width: 90px; height: 90px; margin-bottom: 10px; }
+        .student-dashboard { background: white; border-radius: 20px; padding: 30px; box-shadow: 0 15px 30px rgba(0,0,0,0.08); display: flex; flex-wrap: wrap; gap: 40px; align-items: center; justify-content: center; }
+        .student-profile { text-align: center; flex: 1; min-width: 280px; }
+        .student-avatar-large { width: 160px; height: 160px; border-width: 5px; margin-bottom: 15px; }
+        .progress-wrapper { display: flex; flex-direction: column; align-items: center; }
+        
+        .thermometer-wrapper { position: relative; display: flex; flex-direction: column; align-items: center; margin: 20px 100px 20px 20px; }
+        .thermometer-tube { position: relative; width: 44px; height: 500px; background: #e2e8f0; border-radius: 22px 22px 0 0; border: 4px solid #cbd5e1; overflow: visible; box-shadow: inset 0 0 10px rgba(0,0,0,0.15); }
+        .thermometer-fill { position: absolute; bottom: 0; left: 0; width: 100%; height: 0%; background: linear-gradient(to top, #ef4444, #f87171); transition: height 1.5s cubic-bezier(0.34, 1.56, 0.64, 1); }
+        .thermometer-bulb { width: 84px; height: 84px; background: #ef4444; border-radius: 50%; border: 4px solid #cbd5e1; margin-top: -6px; z-index: 2; }
+        .medal-marker { position: absolute; left: 54px; display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: bold; background: white; padding: 6px 12px; border-radius: 8px; border: 2px solid #cbd5e1; white-space: nowrap; z-index: 5; transform: translateY(-50%); box-shadow: 0 3px 6px rgba(0,0,0,0.08); }
+        .medal-marker::before { content: ''; position: absolute; left: -10px; top: 50%; width: 10px; height: 3px; background: #94a3b8; }
+        .certificate-btn { background: linear-gradient(135deg, #b8860b, #d4af37); color: white; border: none; padding: 12px 22px; border-radius: 10px; font-weight: bold; cursor: pointer; margin-top: 15px; font-size: 15px; box-shadow: 0 4px 12px rgba(184,134,11,0.3); display: none; }
+
+        .cert-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 1000; justify-content: center; align-items: center; padding: 10px; box-sizing: border-box; }
+        .cert-card { 
+            background: #faf6ed; 
+            border: 8px solid #d4af37; 
+            outline: 2px solid #b8860b;
+            outline-offset: -12px;
+            padding: 40px 60px; 
+            text-align: center; 
+            max-width: 920px; 
+            width: 100%; 
+            position: relative; 
+            box-shadow: 0 25px 50px rgba(0,0,0,0.5); 
+            box-sizing: border-box;
+            overflow: hidden;
+        }
+        .cert-corner-tr {
+            position: absolute;
+            top: 0; right: 0;
+            width: 260px; height: 180px;
+            background: radial-gradient(circle at 100% 0%, #0f172a 50%, #d4af37 75%, transparent 80%);
+            border-bottom-left-radius: 100%;
+            z-index: 1;
+            pointer-events: none;
+        }
+        .cert-corner-bl {
+            position: absolute;
+            bottom: 0; left: 0;
+            width: 260px; height: 180px;
+            background: radial-gradient(circle at 0% 100%, #0f172a 50%, #d4af37 75%, transparent 80%);
+            border-top-right-radius: 100%;
+            z-index: 1;
+            pointer-events: none;
+        }
+        .cert-content { position: relative; z-index: 2; }
+        .cert-title { font-family: 'Cinzel', serif; font-size: 34px; font-weight: 700; color: #1e293b; letter-spacing: 2px; margin: 10px 0 5px 0; }
+        .cert-student-name { font-family: 'Cinzel', serif; font-size: 32px; color: #d4af37; margin: 15px 0; font-weight: 800; letter-spacing: 3px; text-transform: uppercase; }
+
+        table { width: 100%; border-collapse: collapse; background: white; border-radius: 12px; overflow: hidden; font-size: 14px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #f1f5f9; }
+        th { background-color: var(--primary); color: white; }
+        .back-btn { background: #64748b; color: white; border: none; padding: 8px 15px; border-radius: 6px; cursor: pointer; margin-bottom: 15px; font-weight: bold; }
+        .panel-box { background: white; padding: 20px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+        .class-badge { display: inline-block; padding: 3px 8px; border-radius: 12px; font-size: 11px; font-weight: bold; color: white; margin-left: 5px; }
+        .badge-4a { background-color: #2563eb; } .badge-4b { background-color: #059669; }
+
+        @media print {
+            @page { size: landscape; margin: 0; }
+            html, body { height: 100vh; overflow: hidden; background: white !important; }
+            body * { visibility: hidden; }
+            #certModal { display: flex !important; background: transparent !important; position: absolute; left: 0; top: 0; width: 100vw; height: 100vh; padding: 0; margin: 0; align-items: center; justify-content: center; }
+            #printCertificateArea, #printCertificateArea * { visibility: visible; }
+            #printCertificateArea { 
+                position: absolute; left: 0; top: 0; width: 100vw; height: 100vh; 
+                border: 8px solid #d4af37 !important; box-shadow: none !important; 
+                margin: 0; padding: 30px 40px !important; background: #faf6ed !important; box-sizing: border-box;
+            }
+            .no-print { display: none !important; }
+        }
+    </style>
+</head>
+<body>
+    <header><h2>Ezber Takip Sistemi</h2></header>
+    <div class="container" id="appContainer"></div>
+
+    <div id="certModal" class="cert-modal">
+        <div class="cert-card" id="printCertificateArea">
+            <div class="cert-corner-tr"></div>
+            <div class="cert-corner-bl"></div>
+            <span class="no-print" style="position:absolute; top:15px; right:20px; font-size:28px; cursor:pointer; z-index:10; color:#b8860b; font-weight:bold;" onclick="closeCert()">×</span>
+            
+            <div class="cert-content">
+                <div style="font-size: 60px; margin-bottom: 0px;" id="certMedalIcon">🥉</div>
+                <div class="cert-title">Başarı Belgesi</div>
+                <div class="cert-student-name" id="certStudentName">ÖĞRENCİ ADI</div>
+                
+                <p style="color: #334155; font-size: 15px; line-height: 1.6; padding: 0 40px; margin: 20px 0;">
+                    Gösterdiği azim ve gayretle duaları ve sureleri başarıyla ezberleyerek bu belgeyi almaya hak kazanmıştır. Öğrencimizi tebrik eder, başarılarının devamını dileriz.
+                </p>
+
+                <div style="margin-top: 35px; text-align: center;">
+                    <div style="font-family: 'Cinzel', serif; font-size: 18px; color: #1e293b; font-weight: bold;">Nurgül YORDAM</div>
+                </div>
+            </div>
+            
+            <button class="btn no-print" style="margin-top: 15px; background: linear-gradient(135deg, #b8860b, #8b6508); width: auto; padding: 10px 30px; align-self: center;" onclick="window.print()">🖨️ Sertifikayı Çıktı Al</button>
+        </div>
+    </div>
+
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSy8C9H6nW-jYn7bq29-TcdsRHJW7R84tMdc",
+            authDomain: "sureezber-246a3.firebaseapp.com",
+            projectId: "sureezber-246a3",
+            storageBucket: "sureezber-246a3.firebasestorage.app",
+            messagingSenderId: "538612950356",
+            appId: "1:538612950356:web:0a3b769064b3ec95eed4c1"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+        function playSound(type) {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            if (type === 'fill') {
+                let osc = audioCtx.createOscillator(), gain = audioCtx.createGain();
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(300, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(600, audioCtx.currentTime + 0.3);
+                gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+                gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.3);
+                osc.connect(gain); gain.connect(audioCtx.destination);
+                osc.start(); osc.stop(audioCtx.currentTime + 0.3);
+            } else {
+                [523.25, 659.25, 783.99, 1046.50].forEach((freq, i) => {
+                    let osc = audioCtx.createOscillator(), gain = audioCtx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(freq, audioCtx.currentTime + i * 0.1);
+                    gain.gain.setValueAtTime(0.15, audioCtx.currentTime + i * 0.1);
+                    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + i * 0.1 + 0.6);
+                    osc.connect(gain); gain.connect(audioCtx.destination);
+                    osc.start(audioCtx.currentTime + i * 0.1); osc.stop(audioCtx.currentTime + i * 0.1 + 0.6);
+                });
+            }
+        }
+
+        const mufredat = [
+            { id: 1, ad: "Sübhaneke" }, { id: 2, ad: "Sübhaneke'nin Anlamı" },
+            { id: 3, ad: "Amentü" }, { id: 4, ad: "Amentü'nün Anlamı" },
+            { id: 5, ad: "Fatiha" }, { id: 6, ad: "Fatiha'nin Anlamı" },
+            { id: 7, ad: "Salli Barik" }, { id: 8, ad: "Salli Barik'in Anlamı" },
+            { id: 9, ad: "İhlas" }, { id: 10, ad: "İhlas'ın Anlamı" },
+            { id: 11, ad: "Tahiyyat" }, { id: 12, ad: "Fil Suresi" },
+            { id: 13, ad: "Kureyş Suresi" }, { id: 14, ad: "Maun Suresi" },
+            { id: 15, ad: "Kevser Suresi" }, { id: 16, ad: "Kafirun Suresi" },
+            { id: 17, ad: "Nasr Suresi" }, { id: 18, ad: "Tebbet Suresi" },
+            { id: 19, ad: "Felak Suresi" }, { id: 20, ad: "Nas Suresi" },
+            { id: 21, ad: "Kunut 1" }, { id: 22, ad: "Kunut 2" },
+            { id: 23, ad: "Rabbenâ Duaları" }, { id: 24, ad: "Ayetel Kürsi" }
+        ];
+
+        const varsayilanOgrenciler = [
+            { id: 12, no: 12, name: "HIRA NUR OKDEMİR", sinif: "4-A", photo: "", tamamlananlar: [] },
+            { id: 51, no: 51, name: "ALPER BURMALI", sinif: "4-A", photo: "", tamamlananlar: [] },
+            { id: 54, no: 54, name: "ARİF ALINCA", sinif: "4-A", photo: "", tamamlananlar: [] },
+            { id: 149, no: 149, name: "ZEHRA AKGÜNGÖR", sinif: "4-A", photo: "", tamamlananlar: [] },
+            { id: 151, no: 151, name: "CEMİL DEMİR", sinif: "4-A", photo: "", tamamlananlar: [] },
+            { id: 155, no: 155, name: "CEMİLE DEMİR", sinif: "4-A", photo: "", tamamlananlar: [] },
+            { id: 184, no: 184, name: "MEHMET DEMİR", sinif: "4-A", photo: "", tamamlananlar: [] },
+            { id: 207, no: 207, name: "ALİ KAAN PİRCAN", sinif: "4-A", photo: "", tamamlananlar: [] },
+            { id: 217, no: 217, name: "EFE DUMAN", sinif: "4-A", photo: "", tamamlananlar: [] },
+            { id: 218, no: 218, name: "ERTUĞRUL ATALAY", sinif: "4-A", photo: "", tamamlananlar: [] },
+            { id: 219, no: 219, name: "İSMAİL KUYU", sinif: "4-A", photo: "", tamamlananlar: [] },
+            { id: 220, no: 220, name: "MEHMET HAMZA ÖZDER", sinif: "4-A", photo: "", tamamlananlar: [] },
+            { id: 221, no: 221, name: "MUHAMMED ALİ SAKİN", sinif: "4-A", photo: "", tamamlananlar: [] },
+            { id: 225, no: 225, name: "MUSTAFA YAVAŞ", sinif: "4-A", photo: "", tamamlananlar: [] },
+            { id: 226, no: 226, name: "ORHAN SALIR", sinif: "4-A", photo: "", tamamlananlar: [] },
+            { id: 227, no: 227, name: "MELİK BEHA HINÇER", sinif: "4-A", photo: "", tamamlananlar: [] },
+            { id: 228, no: 228, name: "YUSUF BAYRAM", sinif: "4-A", photo: "", tamamlananlar: [] },
+            { id: 229, no: 229, name: "AZİME KESKİN", sinif: "4-A", photo: "", tamamlananlar: [] },
+            { id: 230, no: 230, name: "ÇİĞDEM SAADET MALAK", sinif: "4-A", photo: "", tamamlananlar: [] },
+            { id: 232, no: 232, name: "ÜMMÜGÜLSÜM KAHRAMAN", sinif: "4-A", photo: "", tamamlananlar: [] },
+            { id: 233, no: 233, name: "HATİCE KÜBRA SALCI", sinif: "4-A", photo: "", tamamlananlar: [] },
+            { id: 234, no: 234, name: "İREM BOZKURT", sinif: "4-A", photo: "", tamamlananlar: [] },
+            { id: 235, no: 235, name: "NEZİHE NUR SEVİMLİ", sinif: "4-A", photo: "", tamamlananlar: [] },
+            { id: 236, no: 236, name: "NİLAY ŞAHAN", sinif: "4-A", photo: "", tamamlananlar: [] },
+            { id: 238, no: 238, name: "ZEYNEP ELA ALGIN", sinif: "4-A", photo: "", tamamlananlar: [] },
+            { id: 250, no: 250, name: "EYLÜL TÜRKMEN", sinif: "4-A", photo: "", tamamlananlar: [] },
+            { id: 271, no: 271, name: "ZEYNEP ÇELİK", sinif: "4-A", photo: "", tamamlananlar: [] },
+            { id: 278, no: 278, name: "AHMET ARİF ALEMDAR", sinif: "4-A", photo: "", tamamlananlar: [] },
+            { id: 282, no: 282, name: "İKRANUR AYDIN", sinif: "4-A", photo: "", tamamlananlar: [] },
+            { id: 45, no: 45, name: "ZEYNEP ÇETİN", sinif: "4-B", photo: "", tamamlananlar: [] },
+            { id: 152, no: 152, name: "MUSTAFA BATAK", sinif: "4-B", photo: "", tamamlananlar: [] },
+            { id: 161, no: 161, name: "EŞREF UYSAL", sinif: "4-B", photo: "", tamamlananlar: [] },
+            { id: 190, no: 190, name: "OĞUZHAN YILDIRIM", sinif: "4-B", photo: "", tamamlananlar: [] },
+            { id: 194, no: 194, name: "SUDE NUR ÖZEN", sinif: "4-B", photo: "", tamamlananlar: [] },
+            { id: 240, no: 240, name: "ASYA ÜLKÜ ALGIN", sinif: "4-B", photo: "", tamamlananlar: [] },
+            { id: 242, no: 242, name: "BERAT ŞAHAN", sinif: "4-B", photo: "", tamamlananlar: [] },
+            { id: 243, no: 243, name: "BİLGE AKYOL", sinif: "4-B", photo: "", tamamlananlar: [] },
+            { id: 244, no: 244, name: "DENİZHAN SEMİZ", sinif: "4-B", photo: "", tamamlananlar: [] },
+            { id: 245, no: 245, name: "EBRAR SU KAYGUSUZ", sinif: "4-B", photo: "", tamamlananlar: [] },
+            { id: 246, no: 246, name: "EBUBEKİR SEVİM", sinif: "4-B", photo: "", tamamlananlar: [] },
+            { id: 248, no: 248, name: "ELİFECE BEYREK", sinif: "4-B", photo: "", tamamlananlar: [] },
+            { id: 249, no: 249, name: "ERTUĞRUL DEMİR", sinif: "4-B", photo: "", tamamlananlar: [] },
+            { id: 252, no: 252, name: "HATİCE KÜBRA ŞAHAN", sinif: "4-B", photo: "", tamamlananlar: [] },
+            { id: 253, no: 253, name: "İREM SU ZEYNEP BAYHAN", sinif: "4-B", photo: "", tamamlananlar: [] },
+            { id: 254, no: 254, name: "METE BİLAL KAHRAMAN", sinif: "4-B", photo: "", tamamlananlar: [] },
+            { id: 256, no: 256, name: "ORHAN FATİH ATMACA", sinif: "4-B", photo: "", tamamlananlar: [] },
+            { id: 258, no: 258, name: "SEFAHAMZA FERİK", sinif: "4-B", photo: "", tamamlananlar: [] },
+            { id: 260, no: 260, name: "TUĞÇE KÖSEOĞLU", sinif: "4-B", photo: "", tamamlananlar: [] },
+            { id: 261, no: 261, name: "UĞUR AK", sinif: "4-B", photo: "", tamamlananlar: [] },
+            { id: 262, no: 262, name: "ZEYNEP EYLÜL ÇETİN", sinif: "4-B", photo: "", tamamlananlar: [] },
+            { id: 277, no: 277, name: "ECRİN SİMİTCİ", sinif: "4-B", photo: "", tamamlananlar: [] },
+            { id: 281, no: 281, name: "ELA BORAN", sinif: "4-B", photo: "", tamamlananlar: [] },
+            { id: 285, no: 285, name: "HASAN AYDIN", sinif: "4-B", photo: "", tamamlananlar: [] },
+            { id: 500, no: 500, name: "HALİL İBRAHİM DİNÇ", sinif: "4-B", photo: "", tamamlananlar: [] }
+        ];
+
+        let ogrenciler = [], ogretmenSifresi = "1923", sinifSifresi = "713565", aktifSinif = "";
+
+        function initFirebaseSync() {
+            db.collection("sistem").doc("sifreler").onSnapshot(doc => {
+                if (doc.exists) {
+                    ogretmenSifresi = doc.data().ogretmen || "1923";
+                    sinifSifresi = doc.data().sinifSifresi || "713565";
+                } else {
+                    db.collection("sistem").doc("sifreler").set({ ogretmen: "1923", sinifSifresi: "713565" });
+                }
+            });
+            db.collection("ogrenciler").onSnapshot(snapshot => {
+                if (snapshot.empty) {
+                    varsayilanOgrenciler.forEach(o => db.collection("ogrenciler").doc(o.id.toString()).set(o));
+                } else {
+                    ogrenciler = [];
+                    snapshot.forEach(doc => ogrenciler.push(doc.data()));
+                    ogrenciler.sort((a, b) => a.name.localeCompare(b.name, 'tr'));
+                }
+            });
+        }
+
+        function renderHome() {
+            document.getElementById('appContainer').innerHTML = `
+                <div class="home-box">
+                    <h3>Hoş Geldiniz</h3>
+                    <p style="color:#64748b; margin-bottom:25px;">Lütfen giriş türünü seçiniz:</p>
+                    <button class="home-btn" onclick="renderTeacherLogin()">Öğretmen Girişi 🔒</button>
+                    <button class="home-btn" style="background-color: #2563eb;" onclick="renderClassPasswordPrompt('4-A')">4-A Sınıfı Girişi 🎒</button>
+                    <button class="home-btn" style="background-color: #059669;" onclick="renderClassPasswordPrompt('4-B')">4-B Sınıfı Girişi 🎒</button>
+                </div>`;
+        }
+
+        function renderTeacherLogin() {
+            document.getElementById('appContainer').innerHTML = `
+                <button class="back-btn" onclick="renderHome()">← Ana Sayfaya Dön</button>
+                <div class="card-box">
+                    <h3>Öğretmen Girişi</h3>
+                    <input type="password" id="teacherPass" placeholder="Öğretmen Şifresi">
+                    <button class="btn" onclick="loginTeacher()">Giriş Yap</button>
+                </div>`;
+        }
+
+        function loginTeacher() {
+            if (document.getElementById('teacherPass').value === ogretmenSifresi) renderTeacherDashboard();
+            else alert("Hatalı öğretmen şifresi!");
+        }
+
+        function renderClassPasswordPrompt(sinif) {
+            aktifSinif = sinif;
+            document.getElementById('appContainer').innerHTML = `
+                <button class="back-btn" onclick="renderHome()">← Ana Sayfaya Dön</button>
+                <div class="card-box">
+                    <h3>${sinif} Sınıfı Şifre Girişi</h3>
+                    <p style="font-size:13px; color:#64748b;">Lütfen sınıf şifresini giriniz:</p>
+                    <input type="password" id="classPassInput" placeholder="Şifre">
+                    <button class="btn" onclick="verifyClassPassword()">Giriş Yap</button>
+                </div>`;
+        }
+
+        function verifyClassPassword() {
+            if (document.getElementById('classPassInput').value === sinifSifresi) renderStudentSelectionGrid(aktifSinif);
+            else alert("Hatalı şifre!");
+        }
+
+        function renderStudentSelectionGrid(secilenSinif) {
+            let container = document.getElementById('appContainer');
+            container.innerHTML = `
+                <button class="back-btn" onclick="renderHome()">← Ana Sayfaya Dön</button>
+                <h2>${secilenSinif} Sınıfı Öğrenci Listesi</h2>
+                <p style="color:#64748b; margin-top:0;">Lütfen listeden kendi adınızı seçin:</p>
+                <div class="student-grid" id="ogrenciGrid"></div>`;
+            let grid = document.getElementById('ogrenciGrid');
+            ogrenciler.forEach(o => {
+                if (o.sinif !== secilenSinif) return;
+                let card = document.createElement('div');
+                card.className = 'student-card-item';
+                card.onclick = () => renderStudentDashboard(o.id, secilenSinif);
+                let avatarHTML = o.photo ? `<img src="${o.photo}" class="grid-avatar">` : `<div class="grid-avatar" style="display:flex;align-items:center;justify-content:center;font-size:35px;">👤</div>`;
+                card.innerHTML = `${avatarHTML}<div style="font-weight:bold; font-size:13px; margin-bottom:4px;">${o.name}</div><div style="font-size:11px; color:#64748b;">No: ${o.no}</div>`;
+                grid.appendChild(card);
+            });
+        }
+
+        function renderStudentDashboard(ogrenciId, sinifTipi) {
+            let ogrenci = ogrenciler.find(o => o.id === ogrenciId);
+            if (!ogrenci) return;
+            let toplamGorev = mufredat.length, tamamlananSayisi = ogrenci.tamamlananlar.length, yuzde = (tamamlananSayisi / toplamGorev) * 100;
+            let siradaki = mufredat.find(m => !ogrenci.tamamlananlar.includes(m.id));
+            let siradakiMetin = siradaki ? siradaki.ad : "Tüm Ezberler Bitti! Zirvedesin! 🥇";
+
+            let maunBitti = ogrenci.tamamlananlar.includes(14); 
+            let nasBitti = ogrenci.tamamlananlar.includes(20);  
+            let ayetelKursiBitti = ogrenci.tamamlananlar.includes(24); 
+            let tumuBitti = (tamamlananSayisi === toplamGorev);
+
+            let madalya = "Başlangıç Seviyesi", medalEmoji = "⭐", sertifikaGoster = false;
+
+            if (tumuBitti && ayetelKursiBitti) {
+                madalya = "🥇 Altın Madalya"; medalEmoji = "🥇"; sertifikaGoster = true;
+            } else if (nasBitti) {
+                madalya = "🥈 Gümüş Madalya"; medalEmoji = "🥈"; sertifikaGoster = true;
+            } else if (maunBitti) {
+                madalya = "🥉 Bronz Madalya"; medalEmoji = "🥉"; sertifikaGoster = true;
+            }
+
+            let avatarHTML = ogrenci.photo ? `<img src="${ogrenci.photo}" class="student-avatar-large">` : `<div class="student-avatar-large" style="display:flex;align-items:center;justify-content:center;font-size:70px;margin:0 auto 15px auto;">👤</div>`;
+
+            document.getElementById('appContainer').innerHTML = `
+                <button class="back-btn" onclick="renderStudentSelectionGrid('${sinifTipi}')">← ${sinifTipi} Listesine Dön</button>
+                <div class="student-dashboard">
+                    <div class="student-profile">
+                        ${avatarHTML}
+                        <h2 style="margin:5px 0; font-size:24px;">${ogrenci.name}</h2>
+                        <p style="color:#64748b; margin-top:0;">Sınıf: ${ogrenci.sinif} | No: ${ogrenci.no}</p>
+                        <div style="background:#f8fafc; padding:15px; border-radius:12px; margin-top:20px; border:1px solid #e2e8f0; text-align:left;">
+                            <p style="margin:0; color:#64748b; font-size:13px; font-weight:bold;">📌 Sıradaki Ödevi / Duası:</p>
+                            <h3 style="color:var(--secondary); margin:8px 0 0 0; font-size:16px;">${siradakiMetin}</h3>
+                        </div>
+                        <h4 style="color:#d97706; margin-top:15px; font-size:17px;">${madalya}</h4>
+                        <button id="certBtn" class="certificate-btn" style="display: ${sertifikaGoster ? 'inline-block' : 'none'};" onclick="openCert('${ogrenci.name}', '${medalEmoji}')">🏆 Başarı Sertifikasını Görüntüle</button>
+                    </div>
+                    <div class="progress-wrapper">
+                        <h3 style="margin-bottom:5px; color:var(--primary); font-size:16px;">Ezber Derecesi</h3>
+                        <div class="thermometer-wrapper">
+                            <div class="thermometer-tube">
+                                <div id="barFill" class="thermometer-fill" style="height: 0%;"></div>
+                                <div class="medal-marker" style="bottom: 58.3%;">🥉 Bronz Madalya</div>
+                                <div class="medal-marker" style="bottom: 83.3%;">🥈 Gümüş Madalya</div>
+                                <div class="medal-marker" style="bottom: 98%;">🥇 Altın Madalya</div>
+                            </div>
+                            <div class="thermometer-bulb"></div>
+                        </div>
+                        <p style="font-weight:bold; margin-top:8px; font-size:15px;">%${Math.round(yuzde)} Tamamlandı</p>
+                    </div>
+                </div>`;
+
+            setTimeout(() => {
+                document.getElementById('barFill').style.height = yuzde + '%';
+                playSound('fill');
+                if (sertifikaGoster) setTimeout(() => playSound('applause'), 800);
+            }, 300);
+        }
+
+        function openCert(name, medal) {
+            document.getElementById('certStudentName').innerText = name;
+            document.getElementById('certMedalIcon').innerText = medal;
+            document.getElementById('certModal').style.display = 'flex';
+            playSound('triumph');
+        }
+
+        function closeCert() { document.getElementById('certModal').style.display = 'none'; }
+
+        function renderTeacherDashboard() {
+            let ogrenciler4A = ogrenciler.filter(o => o.sinif === '4-A');
+            let ogrenciler4B = ogrenciler.filter(o => o.sinif === '4-B');
+            document.getElementById('appContainer').innerHTML = `
+                <button class="back-btn" onclick="renderHome()">← Çıkış Yap</button>
+                <h2>Öğretmen Kontrol Paneli</h2>
+                <div class="panel-box" style="background: #fef3c7; border: 1px solid #f59e0b;">
+                    <h3 style="margin-top:0; color:#b45309;">🔑 Şifreleri Değiştir</h3>
+                    <div style="display:flex; gap:10px; flex-wrap:wrap;">
+                        <div style="flex:1; min-width:200px;"><label style="font-size:12px; font-weight:bold;">Yeni Öğretmen Şifresi:</label><input type="text" id="yeniOgretmenSifre" placeholder="Örn: 1923"></div>
+                        <div style="flex:1; min-width:200px;"><label style="font-size:12px; font-weight:bold;">Yeni Sınıf Şifresi:</label><input type="text" id="yeniSinifSifre" placeholder="Örn: 713565"></div>
+                    </div>
+                    <button class="btn" style="background-color:#d97706; margin-top:10px;" onclick="sifreleriKaydet()">Şifreleri Güncelle</button>
+                </div>
+                <div class="panel-box">
+                    <h3>➕ Yeni Öğrenci Ekle</h3>
+                    <input type="text" id="yeniAd" placeholder="Öğrenci Adı Soyadı">
+                    <div style="display:flex; gap:10px;">
+                        <input type="number" id="yeniNo" placeholder="No">
+                        <select id="yeniSinif" style="padding:12px; margin:10px 0; border:1px solid #cbd5e1; border-radius:8px; font-size:15px; width:100%;"><option value="4-A">4-A Sınıfı</option><option value="4-B">4-B Sınıfı</option></select>
+                    </div>
+                    <button class="btn" onclick="ogrenciEkle()">Öğrenciyi Kaydet</button>
+                </div>
+                <h3>📚 4-A Sınıfı Listesi (${ogrenciler4A.length} Öğrenci)</h3>
+                <div style="overflow-x:auto; margin-bottom:30px;">${ogrenciTablosuOlustur(ogrenciler4A)}</div>
+                <h3>📚 4-B Sınıfı Listesi (${ogrenciler4B.length} Öğrenci)</h3>
+                <div style="overflow-x:auto;">${ogrenciTablosuOlustur(ogrenciler4B)}</div>`;
+        }
+
+        function ogrenciTablosuOlustur(liste) {
+            if (liste.length === 0) return '<p style="color:#64748b; padding:15px; background:white; border-radius:8px;">Bu sınıfta henüz öğrenci bulunmuyor.</p>';
+            return `<table><tr><th>Foto</th><th>No / Ad Soyad</th><th>Sure ve Anlamları</th><th>İşlem</th></tr>` +
+                liste.map(ogrenci => `
+                    <tr>
+                        <td style="text-align:center;">${ogrenci.photo ? `<img src="${ogrenci.photo}" style="width:40px;height:40px;border-radius:50%;object-fit:cover;">` : '👤'}<br><input type="file" accept="image/*" onchange="fotografYukle(event, ${ogrenci.id})" style="font-size:9px;width:75px;margin-top:4px;"></td>
+                        <td><b>${ogrenci.no}</b> - ${ogrenci.name}<br><span class="class-badge ${ogrenci.sinif === '4-A' ? 'badge-4a' : 'badge-4b'}">${ogrenci.sinif}</span></td>
+                        <td><div style="display:flex; flex-wrap:wrap; gap:6px; max-height:140px; overflow-y:auto; padding:5px; background:#f8fafc; border-radius:6px;">
+                            ${mufredat.map(m => `<label style="font-size:11px; background:white; padding:3px 6px; border-radius:4px; border:1px solid #cbd5e1; cursor:pointer;"><input type="checkbox" ${ogrenci.tamamlananlar.includes(m.id) ? 'checked' : ''} onchange="ezberGuncelle(${ogrenci.id}, ${m.id})">${m.ad}</label>`).join('')}
+                        </div></td>
+                        <td><button class="btn btn-danger" style="padding:6px 10px; font-size:12px;" onclick="ogrenciSil(${ogrenci.id})">Sil</button></td>
+                    </tr>`).join('') + `</table>`;
+        }
+
+        function sifreleriKaydet() {
+            let yeniOgretmen = document.getElementById('yeniOgretmenSifre').value;
+            let yeniSinif = document.getElementById('yeniSinifSifre').value;
+            let updateObj = {};
+            if (yeniOgretmen) updateObj.ogretmen = yeniOgretmen;
+            if (yeniSinif) updateObj.sinifSifresi = yeniSinif;
+            db.collection("sistem").doc("sifreler").update(updateObj).then(() => { alert("Şifreler güncellendi!"); renderTeacherDashboard(); });
+        }
+
+        function ogrenciEkle() {
+            let name = document.getElementById('yeniAd').value, no = document.getElementById('yeniNo').value, sinif = document.getElementById('yeniSinif').value;
+            if (!name || !no || !sinif) { alert("Lütfen tüm alanları doldurun!"); return; }
+            let yeniId = parseInt(no);
+            db.collection("ogrenciler").doc(yeniId.toString()).set({ id: yeniId, no: parseInt(no), name: name.toUpperCase(), sinif: sinif, photo: "", tamamlananlar: [] }).then(() => renderTeacherDashboard());
+        }
+
+        function ogrenciSil(id) {
+            if (confirm("Silmek istediğinize emin misiniz?")) db.collection("ogrenciler").doc(id.toString()).delete().then(() => renderTeacherDashboard());
+        }
+
+        function ezberGuncelle(ogrenciId, mufredatId) {
+            let ogrenci = ogrenciler.find(o => o.id === ogrenciId);
+            if (ogrenci) {
+                let tamamlananlar = [...ogrenci.tamamlananlar], index = tamamlananlar.indexOf(mufredatId);
+                if (index > -1) tamamlananlar.splice(index, 1); else tamamlananlar.push(mufredatId);
+                db.collection("ogrenciler").doc(ogrenciId.toString()).update({ tamamlananlar });
+            }
+        }
+
+        function fotografYukle(event, ogrenciId) {
+            let file = event.target.files[0];
+            if (file) {
+                let reader = new FileReader();
+                reader.onload = e => db.collection("ogrenciler").doc(ogrenciId.toString()).update({ photo: e.target.result });
+                reader.readAsDataURL(file);
+            }
+        }
+
+        window.onload = () => { initFirebaseSync(); renderHome(); };
+    </script>
+</body>
+</html>
